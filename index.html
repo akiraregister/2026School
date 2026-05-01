@@ -716,6 +716,693 @@ window.toggleShortlist = toggleShortlist;
 window.updateNote = updateNote;
 window.archiveSchool = archiveSchool;
 window.restoreSchool = restoreSchool;
+window.toggleFilters = toggleFilters;
+
+startFirebaseSync();
+</script>
+</body>
+</html>.row { margin-bottom:12px; }
+.actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+button {
+  border:none; border-radius:12px; padding:10px 14px; font-weight:700; cursor:pointer;
+  background:var(--brand); color:#fff;
+}
+button.secondary { background:#eef2ff; color:#3730a3; }
+button.ghost { background:#f3f4f6; color:#111827; }
+button.warn { background:#fee2e2; color:#991b1b; }
+button.restore { background:#dcfce7; color:#166534; }
+.results { padding:18px; min-height:70vh; }
+.summary { display:grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+.metric { background:#f8fafc; border:1px solid var(--line); border-radius:14px; padding:14px; }
+.metric .k { font-size:12px; color:var(--muted); margin-bottom:6px; }
+.metric .v { font-size:24px; font-weight:800; }
+.list { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; }
+.card { background:#fff; border:1px solid var(--line); border-radius:18px; padding:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:12px; }
+.card.shortlisted { outline:3px solid #bfdbfe; }
+.card.excelExcluded { background:linear-gradient(180deg,#fff 0%, #f3f4f6 100%); }
+.card.archived { background:#f8fafc; opacity:.95; }
+.card h3 { margin:0; font-size:18px; line-height:1.4; }
+.meta { display:flex; gap:8px; flex-wrap:wrap; }
+.chip { background:var(--chip); color:#3730a3; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+.chip.gray { background:#f3f4f6; color:#374151; }
+.chip.warn { background:var(--warnbg); color:var(--warn); }
+.chip.muted { background:#e5e7eb; color:#4b5563; }
+.kv { display:grid; grid-template-columns: 110px 1fr; gap:8px; font-size:14px; }
+.kv div:nth-child(odd) { color:var(--muted); font-weight:700; }
+.memo { font-size:14px; line-height:1.65; }
+.concerns { background:var(--warnbg); border:1px solid #fecaca; border-radius:14px; padding:12px; }
+.concerns h4 { margin:0 0 8px; color:var(--warn); font-size:13px; }
+.concerns ul { margin:0; padding-left:18px; }
+.concerns li { margin:4px 0; color:var(--warn); }
+.infoBox { background:#f8fafc; border:1px dashed #cbd5e1; border-radius:14px; padding:12px; font-size:13px; line-height:1.65; }
+.links { display:flex; gap:8px; flex-wrap:wrap; }
+.links a {
+  text-decoration:none; border:1px solid #dbeafe; background:#eff6ff; color:#1d4ed8;
+  padding:8px 10px; border-radius:10px; font-size:13px; font-weight:700;
+}
+.notes {
+  background:#fafafa; border:1px dashed #d1d5db; border-radius:14px; padding:10px;
+}
+.small { color:var(--muted); font-size:12px; }
+.empty { text-align:center; color:var(--muted); padding:50px 20px; }
+.archives { margin-top:22px; }
+.archives h3 { margin:0 0 12px; font-size:18px; }
+footer { max-width:1440px; margin:18px auto 40px; color:var(--muted); font-size:12px; padding:0 20px; line-height:1.6; }
+@media (max-width: 1100px) {
+  .topbar { grid-template-columns:1fr; }
+  .filters { position:static; }
+}
+@media (max-width: 800px) {
+  .summary { grid-template-columns:1fr 1fr; }
+  .grid2 { grid-template-columns:1fr; }
+}
+
+/* ── モバイル フィルター折りたたみ ── */
+.filter-toggle-btn {
+  display: none;
+  width: 100%;
+  padding: 12px 16px;
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  margin-bottom: 14px;
+}
+.filter-toggle-btn span { float: right; transition: transform .25s; }
+.filter-toggle-btn.open span { transform: rotate(180deg); }
+.filter-body { transition: none; }
+
+@media (max-width: 1100px) {
+  .filter-toggle-btn { display: block; }
+  .filter-body.collapsed { display: none; }
+}
+
+/* ── Firebase セットアップバナー ── */
+.fb-setup {
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.fb-setup h4 { margin: 0 0 8px; color: #92400e; font-size: 14px; }
+.fb-setup ol { margin: 0; padding-left: 18px; color: #78350f; }
+.fb-setup li { margin: 3px 0; }
+.fb-setup code { background: rgba(0,0,0,0.07); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+.fb-setup a { color: #b45309; }
+.fb-setup.hidden { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>東京の学校選びダッシュボード</h1>
+    <div class="sub">
+      メモ・ショートリスト・除外・復元はFirebase同期で、同じURLを開いている相手のブラウザにもリアルタイム反映されます。
+    </div>
+    <div class="syncbar">
+      <span class="sync-pill" id="syncStatus">接続確認中…</span>
+      <span class="sync-pill local" id="boardIdPill"></span>
+    </div>
+  </div>
+</header>
+
+<div class="topbar">
+  <aside class="panel filters">
+    <h2>絞り込み</h2>
+
+    <!-- Firebase 未設定時のセットアップ案内 -->
+    <div class="fb-setup" id="fbSetupBanner">
+      <h4>🔥 Firebase 同期が未設定です</h4>
+      <ol>
+        <li><a href="https://console.firebase.google.com/" target="_blank">console.firebase.google.com</a> を開く</li>
+        <li>「プロジェクトを追加」→ 適当な名前でOK（例: tokyo-school）</li>
+        <li>左メニュー「構築」→「Firestore Database」→「データベースを作成」→「テストモード」を選択</li>
+        <li>「プロジェクトの設定（⚙️）」→「ウェブアプリ」→「アプリを追加」→ 表示された設定値をコピー</li>
+        <li>このHTMLファイルをテキストエディタで開き、<code>FIREBASE_CONFIG = {</code> の中の値を貼り付けて保存</li>
+        <li>同じHTMLファイルを奥さまと共有すれば完了</li>
+      </ol>
+    </div>
+
+    <!-- モバイル用 折りたたみボタン -->
+    <button class="filter-toggle-btn" id="filterToggleBtn" onclick="toggleFilters()">
+      絞り込みを開く <span>▼</span>
+    </button>
+
+    <!-- フィルター本体（モバイルでは最初に折りたたまれる） -->
+    <div class="filter-body collapsed" id="filterBody">
+
+    <div class="row">
+      <label for="boardInput">共有ボードID</label>
+      <input id="boardInput" type="text" placeholder="例: tokyo-school-family" />
+      <div class="small" style="margin-top:6px;">奥さま・ご本人ともに同じ URL の <code>?board=...</code> を開くと同じ状態を見ます。</div>
+    </div>
+
+    <div class="row">
+      <label for="search">キーワード検索</label>
+      <input id="search" type="search" placeholder="学校名、場所、メモ、備考で検索" />
+    </div>
+
+    <div class="grid2">
+      <div class="row"><label for="category">カテゴリー</label><select id="category"></select></div>
+      <div class="row"><label for="ward">区</label><select id="ward"></select></div>
+      <div class="row"><label for="gender">男女</label><select id="gender"></select></div>
+      <div class="row"><label for="ibCertified">IB認定</label><select id="ibCertified"></select></div>
+      <div class="row"><label for="chinese">中国語</label><select id="chinese"></select></div>
+      <div class="row"><label for="priority">優先度</label><select id="priority"></select></div>
+    </div>
+
+    <div class="row">
+      <label for="sort">並び替え</label>
+      <select id="sort">
+        <option value="priority">優先度順</option>
+        <option value="name">学校名順</option>
+        <option value="feeAsc">Total Fee 低い順</option>
+        <option value="feeDesc">Total Fee 高い順</option>
+        <option value="concerns">懸念点が多い順</option>
+      </select>
+    </div>
+
+    <div class="row"><label><input type="checkbox" id="onlyShortlist" /> ショートリストのみ表示</label></div>
+    <div class="row"><label><input type="checkbox" id="onlyConcerns" /> 懸念点ありのみ表示</label></div>
+    <div class="row"><label><input type="checkbox" id="hideExcelExcluded" /> 「検討候補外（グレー）」を隠す</label></div>
+
+    <div class="actions">
+      <button id="resetBtn" class="ghost">条件をリセット</button>
+      <button id="exportBtn" class="secondary">ショートリストを書き出し</button>
+      <button id="copyLinkBtn" class="secondary">共有リンクをコピー</button>
+    </div>
+
+    </div><!-- /filter-body -->
+  </aside>
+
+  <main class="panel results">
+    <h2>候補一覧</h2>
+    <div class="summary" id="summary"></div>
+    <div class="list" id="list"></div>
+    <div class="empty" id="empty" hidden>条件に合う学校がありません。絞り込みを少し緩めてみてください。</div>
+
+    <section class="archives">
+      <h3>完全除外した学校（後で戻せます）</h3>
+      <div class="list" id="archiveList"></div>
+      <div class="empty" id="archiveEmpty">まだ完全除外した学校はありません。</div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  データソース: tokyo_school_guide_3.xlsx。<br>
+  この版では UI 操作の状態を Firebase Firestore に保存します。<strong>ページ内の操作はリアルタイム同期</strong>されますが、HTML 自体を編集した場合は再デプロイが必要です。
+</footer>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
+import { getFirestore, doc, onSnapshot, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAzRG8cpteA99-I3Uf4FNz_wZGOUT-FhDU",
+  authDomain: "school-v2-27e00.firebaseapp.com",
+  projectId: "school-v2-27e00",
+  storageBucket: "school-v2-27e00.firebasestorage.app",
+  messagingSenderId: "389523075207",
+  appId: "1:389523075207:web:fb149f6d69915716f14822"
+};
+
+const schools = [{"id": 1, "name": "Tokyo International School (TIS)", "ward": "港区", "area": "元麻布", "category": "インター", "ibCertified": "✅", "ibLevel": "PYP・MYP・DP", "curriculum": "IB一貫", "gender": "共学", "grades": "K〜12年生", "oneTimeFee": "1430000", "annualFee": "3300000", "totalFee": "4730000", "chinese": "なし", "priority": "★★★", "memo": "SCISからの転入に最も親和性が高い。70カ国以上の多国籍環境。IB PYP一貫。2026年8月に高輪ゲートウェイシティへ移転予定。", "site": "https://tokyois.com/", "instagram": "https://www.instagram.com/tislearners/", "facebook": "https://www.facebook.com/TIScommunity/", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "May 4, 4-5pm JST Online Open House", "concerns": [{"field": "Annual Fee", "value": "3300000"}]}, {"id": 2, "name": "Canadian International School (CIS)", "ward": "品川区", "area": "北品川／中目黒", "category": "インター", "ibCertified": "✅", "ibLevel": "PYP・MYP・DP", "curriculum": "カナダ式＋IB", "gender": "共学", "grades": "K〜12年生", "oneTimeFee": "900000", "annualFee": "2675000", "totalFee": "3575000", "chinese": "あり", "priority": "★★★", "memo": "IB一貫校かつ中国語プログラムあり。Chinese Heritage Language Programが充実。中国系家庭の在籍も多く、帰国子女受け入れ実績豊富。", "site": "https://www.cisjapan.net/", "instagram": "https://www.instagram.com/cistokyo.official/", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": [{"field": "カリキュラム", "value": "カナダ式＋IB"}]}, {"id": 3, "name": "Shinagawa International School", "ward": "品川区", "area": "品川シーサイド", "category": "インター", "ibCertified": "✅", "ibLevel": "PYP・MYP・DP", "curriculum": "IB一貫", "gender": "共学", "grades": "幼〜高", "oneTimeFee": "1000000", "annualFee": "2675000", "totalFee": "3675000", "chinese": "なし", "priority": "★★", "memo": "2007年創立のIB一貫校。スクールバスあり。教師対生徒比率1:6の少人数制。比較的新しく空き枠がある可能性あり。", "site": "https://sistokyo.jp/", "instagram": "https://www.instagram.com/shinagawa.is/", "facebook": "https://www.facebook.com/shinagawa.is/", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "May 15 7pm JST Open House", "concerns": []}, {"id": 4, "name": "Laurus International School（白金台）", "ward": "港区", "area": "白金台", "category": "インター", "ibCertified": "✅", "ibLevel": "PYP・MYP", "curriculum": "Cambridge＋独自STEM", "gender": "共学", "grades": "幼〜中学部", "oneTimeFee": "300000", "annualFee": "2540000", "totalFee": "2840000", "chinese": "なし", "priority": "★★", "memo": "日本唯一のScience International School。Cambridge国際カリキュラム＋独自Innovatorプログラム。理数重視の少人数制。", "site": "https://www.laurus-school.com/", "instagram": "https://www.instagram.com/laurus_international/", "facebook": "https://www.facebook.com/2016LISS/", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": [{"field": "カリキュラム", "value": "Cambridge＋独自STEM"}, {"field": "対象学年", "value": "幼〜中学部"}]}, {"id": 5, "name": "Capital Tokyo International School (CTIS)", "ward": "港区", "area": "南麻布", "category": "インター", "ibCertified": "✅", "ibLevel": "PYP", "curriculum": "独自＋IB", "gender": "共学", "grades": "G1〜G7", "oneTimeFee": "220000", "annualFee": "3500000", "totalFee": "3720000", "chinese": "なし", "priority": "★★", "memo": "2022年創立。少人数制（クラス12名）。英語・日本語・中国語の3言語教育。PBL・STEAM教育重視。2026年に高校部開校予定。", "site": "https://www.capitaltokyo.com/", "instagram": "", "facebook": "https://www.facebook.com/CTIS2022/", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": [{"field": "カリキュラム", "value": "独自＋IB"}, {"field": "対象学年", "value": "G1〜G7"}]}, {"id": 6, "name": "Nishimachi International School", "ward": "港区", "area": "元麻布", "category": "インター", "ibCertified": "✗", "ibLevel": "なし（WASC/CIS認定）", "curriculum": "米国式", "gender": "共学", "grades": "K〜9年生", "oneTimeFee": "1125000", "annualFee": "3529000", "totalFee": "4654000", "chinese": "なし", "priority": "★★", "memo": "1949年創立。英語＋日本語の2言語教育。帰国子女に最も人気の定番校。6棟キャンパス・屋上運動場3面。少人数・多国籍。", "site": "https://www.nishimachi.ac.jp/", "instagram": "https://www.instagram.com/nishimachiofficial/", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": [{"field": "対象学年", "value": "K〜9年生"}, {"field": "Annual Fee", "value": "3529000"}]}, {"id": 7, "name": "Aoba-Japan International School（目黒）", "ward": "練馬区ネリマ", "area": "光が丘ヒカリ", "category": "インター", "ibCertified": "✅", "ibLevel": "PYP・MYP・DP", "curriculum": "IB一貫", "gender": "共学", "grades": "幼〜高（目黒は幼〜小）", "oneTimeFee": "1125000", "annualFee": "2332000", "totalFee": "3457000", "chinese": "なし", "priority": "★", "memo": "1976年創立のIB一貫校。日本人帰国子女に特化。バイリンガル対応。目黒キャンパスは幼〜小学部のみ。", "site": "https://japaninternationalschool.com/", "instagram": "https://www.instagram.com/aobajapan/", "facebook": "https://www.facebook.com/aobajapan/", "visit": "", "contactDate": "", "response": "", "status": "✗", "notes": "", "concerns": [{"field": "区", "value": "練馬区ネリマ"}, {"field": "場所", "value": "光が丘ヒカリ"}]}, {"id": 8, "name": "ISSH（聖心インターナショナルスクール）", "ward": "渋谷区", "area": "広尾", "category": "インター", "ibCertified": "✗", "ibLevel": "なし（WASC認定）", "curriculum": "米国式", "gender": "女子", "grades": "K〜12年生", "oneTimeFee": "930000", "annualFee": "2990000", "totalFee": "3920000", "chinese": "なし", "priority": "★", "memo": "1908年創立。女子校。外交官・名門家庭が多い伝統校。Advanced Placement Program提供。45カ国500名以上在籍。", "site": "https://www.issh.ac.jp/", "instagram": "https://www.instagram.com/intlschool_sacredheart/", "facebook": "https://www.facebook.com/SacredHeart.Tokyo/", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": [{"field": "男女", "value": "女子"}]}, {"id": 9, "name": "British School in Tokyo（BST）", "ward": "世田谷区", "area": "昭和女子大内", "category": "インター", "ibCertified": "✅", "ibLevel": "DP（高校のみ）", "curriculum": "英国式", "gender": "共学", "grades": "3歳〜18歳", "oneTimeFee": "1180000", "annualFee": "2820000", "totalFee": "4000000", "chinese": "なし", "priority": "★", "memo": "1989年創立。世界トップ100校選出（2025年）。小学部は英国National Curriculum。IBからの転入はやや不連続。スクールバスあり。", "site": "https://www.bst.ac.jp/", "instagram": "https://www.instagram.com/bst_tokyo/", "facebook": "https://www.facebook.com/bst.tokyo/", "visit": "", "contactDate": "", "response": "", "status": "✗", "notes": "", "concerns": [{"field": "区", "value": "世田谷区"}, {"field": "場所", "value": "昭和女子大内"}]}, {"id": 10, "name": "St. Mary's International School", "ward": "世田谷区", "area": "瀬田", "category": "インター", "ibCertified": "✅", "ibLevel": "DP（高校のみ）", "curriculum": "米国式＋IB", "gender": "男子", "grades": "K〜12年生", "oneTimeFee": "", "annualFee": "", "totalFee": "", "chinese": "あり（DP段階）", "priority": "★", "memo": "1954年創立の男子校。50カ国900名以上。9エーカーのキャンパス。音楽・スポーツが充実。DP段階でMandarin選択可。スクールバスあり。", "site": "https://www.smis.ac.jp/", "instagram": "", "facebook": "https://www.facebook.com/StMarysTitans/", "visit": "", "contactDate": "", "response": "", "status": "✗", "notes": "", "concerns": [{"field": "男女", "value": "男子"}]}, {"id": 11, "name": "Seisen International School", "ward": "世田谷区", "area": "用賀", "category": "インター", "ibCertified": "✅", "ibLevel": "PYP・MYP・DP", "curriculum": "米国式＋IB", "gender": "女子", "grades": "K〜12年生", "oneTimeFee": "1000000", "annualFee": "2800000", "totalFee": "3800000", "chinese": "なし", "priority": "★", "memo": "1949年創立の女子校（幼稚園は共学）。IB全課程認定。60カ国以上の生徒在籍。スクールバスあり。用賀の緑豊かなキャンパス。", "site": "https://www.seisen.com/", "instagram": "https://www.instagram.com/seisen_setagaya/", "facebook": "https://www.facebook.com/seisensetagaya/", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": [{"field": "男女", "value": "女子"}]}, {"id": 12, "name": "KAIS International School", "ward": "品川区", "area": "目黒駅近", "category": "インター", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "独自（カリフォルニア基準）", "gender": "共学", "grades": "K〜高", "oneTimeFee": "800000", "annualFee": "2500000", "totalFee": "3300000", "chinese": "なし", "priority": "★", "memo": "小規模・少人数制。毎日17時までアフタースクールあり。共働き家庭向け。最もリーズナブルなインター校の一つ。", "site": "https://kainternationalschool.com", "instagram": "", "facebook": "https://www.facebook.com/kaischool/", "visit": "", "contactDate": "", "response": "", "status": "✗", "notes": "", "concerns": [{"field": "カリキュラム", "value": "独自（カリフォルニア基準）"}]}, {"id": 13, "name": "聖心女子学院初等科", "ward": "港区", "area": "白金台", "category": "私立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "女子", "grades": "小〜高", "oneTimeFee": "460000", "annualFee": "940000", "totalFee": "1400000", "chinese": "なし", "priority": "★", "memo": "カトリック系。生徒の約15%が海外経験者。帰国子女編入実績が最も豊富な私立小。日本語力が必要。ISShとの姉妹校ネットワークあり。", "site": "https://www.hw.ac.jp/", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "試験が難しそうシケnムズカシソ", "concerns": [{"field": "男女", "value": "女子"}]}, {"id": 14, "name": "東洋英和女学院小学部", "ward": "港区", "area": "六本木", "category": "私立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "女子", "grades": "小〜高", "oneTimeFee": "約130〜150万円/年", "annualFee": "", "totalFee": "", "chinese": "なし", "priority": "★", "memo": "プロテスタント系。1884年創立。英語教育の伝統が長い。帰国子女受け入れあり。六本木の好立地。", "site": "https://www.toyoeiwa.ac.jp/", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "✗", "notes": "募集無しボシュウ", "concerns": [{"field": "備考（自由）", "value": "募集無しボシュウ"}]}, {"id": 15, "name": "青山学院初等部", "ward": "渋谷区", "area": "渋谷", "category": "私立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "共学", "grades": "小〜大", "oneTimeFee": "約120〜150万円/年", "annualFee": "", "totalFee": "", "chinese": "なし", "priority": "★", "memo": "キリスト教系。英語教育に強い。帰国子女比率が高い。内部進学で大学まで続く。", "site": "https://www.es.aoyamagakuin.jp/", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "✗", "notes": "募集無しボシュウ", "concerns": [{"field": "備考（自由）", "value": "募集無しボシュウ"}]}, {"id": 16, "name": "慶應義塾幼稚舎", "ward": "渋谷区", "area": "渋谷", "category": "私立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "共学", "grades": "小〜大", "oneTimeFee": "約100〜120万円/年", "annualFee": "", "totalFee": "", "chinese": "なし", "priority": "★", "memo": "慶應系列内部進学。卒業後は慶應中・高・大へ。編入は極めて難関。", "site": "https://www.yochisha.keio.ac.jp/", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "✗", "notes": "", "concerns": [{"field": "特徴・メモ", "value": "慶應系列内部進学。卒業後は慶應中・高・大へ。編入は極めて難関。"}]}, {"id": 17, "name": "光塩女子学院初等科", "ward": "渋谷区", "area": "高円寺コウエn", "category": "私立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "女子", "grades": "小〜高", "oneTimeFee": "約100〜130万円/年", "annualFee": "", "totalFee": "", "chinese": "なし", "priority": "★", "memo": "カトリック系。英語教育・少人数制。帰国子女も在籍。", "site": "https://www.koen-ejh.ed.jp/", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "✗", "notes": "", "concerns": [{"field": "場所", "value": "高円寺コウエn"}]}, {"id": 18, "name": "白百合学園小学校", "ward": "千代田区", "area": "九段（港区から近接）", "category": "私立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "女子", "grades": "小〜高", "oneTimeFee": "約120〜140万円/年", "annualFee": "", "totalFee": "", "chinese": "なし", "priority": "★", "memo": "カトリック系。港区から近い。帰国子女枠あり。英語教育充実。", "site": "https://www.shirayuri.e.ed.jp/", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "✗", "notes": "", "concerns": [{"field": "区", "value": "千代田区"}, {"field": "場所", "value": "九段（港区から近接）"}]}, {"id": 19, "name": "港区立南山小学校", "ward": "港区", "area": "元麻布", "category": "公立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "共学", "grades": "小学校", "oneTimeFee": "無料（実費のみ）", "annualFee": "", "totalFee": "", "chinese": "なし", "priority": "★", "memo": "外国人児童比率が都内トップクラス。多国籍環境。英語対応教員あり。TIS・Nishimachiと同エリア。", "site": "https://www.minato-ecs.ed.jp/school/nanzan-es/", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": []}, {"id": 20, "name": "港区立麻布小学校", "ward": "港区", "area": "麻布", "category": "公立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "共学", "grades": "小学校", "oneTimeFee": "無料（実費のみ）", "annualFee": "", "totalFee": "", "chinese": "なし", "priority": "★", "memo": "外交官・外資系家庭が多い学区。帰国子女対応に慣れている。", "site": "https://www.minato-ecs.ed.jp/school/azabu-es/", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": []}, {"id": 21, "name": "渋谷区立広尾小学校", "ward": "渋谷区", "area": "広尾", "category": "公立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "共学", "grades": "小学校", "oneTimeFee": "無料（実費のみ）", "annualFee": "", "totalFee": "", "chinese": "なし", "priority": "★", "memo": "ISSH近隣。帰国子女・外国人児童が多い。英語活動に積極的。", "site": "https://www.shibuya.ed.jp/hiro-sho/", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": []}, {"id": 22, "name": "目黒区立東山小学校", "ward": "目黒区", "area": "東山", "category": "公立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "共学", "grades": "小学校", "oneTimeFee": "無料（実費のみ）", "annualFee": "", "totalFee": "", "chinese": "なし", "priority": "★", "memo": "目黒区内で学力レベルが最も高いとされる公立校。帰国子女多い。イングリッシュルームあり。", "site": "https://meguro.schoolweb.ne.jp/weblog/index.php?id=1310003", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": []}, {"id": 23, "name": "品川区公立小学校（全般）", "ward": "品川区", "area": "品川区内", "category": "公立小学校", "ibCertified": "✗", "ibLevel": "なし", "curriculum": "日本式", "gender": "共学", "grades": "小学校", "oneTimeFee": "無料（実費のみ）", "annualFee": "", "totalFee": "", "chinese": "なし", "priority": "★", "memo": "区全体で英語教育が先進的。2002年から小中一貫・英語教育に取り組む先進区。", "site": "https://www.city.shinagawa.tokyo.jp/PC/kodomo/kodomo-kyouiku/", "instagram": "", "facebook": "", "visit": "", "contactDate": "", "response": "", "status": "", "notes": "", "concerns": []}];
+
+const filterValues = {
+  category: [...new Set(schools.map(s => s.category).filter(Boolean))],
+  ward: [...new Set(schools.map(s => s.ward).filter(Boolean))],
+  gender: [...new Set(schools.map(s => s.gender).filter(Boolean))],
+  ibCertified: [...new Set(schools.map(s => s.ibCertified).filter(Boolean))],
+  chinese: [...new Set(schools.map(s => s.chinese).filter(Boolean))],
+  priority: [...new Set(schools.map(s => s.priority).filter(Boolean))]
+};
+
+const initialExcelExcluded = Object.fromEntries(schools.filter(s => s.status === "✗").map(s => [String(s.id), true]));
+const url = new URL(window.location.href);
+let boardId = url.searchParams.get("board") || "tokyo-school-family";
+const localKey = `tokyo-school-dashboard-v4-${boardId}`;
+
+const state = {
+  shortlist: {},
+  notes: {},
+  archived: {},
+  filters: {
+    search:"", category:"", ward:"", gender:"", ibCertified:"", chinese:"", priority:"",
+    sort:"priority", onlyShortlist:false, onlyConcerns:false, hideExcelExcluded:false
+  },
+  lastUpdatedAt: null
+};
+
+let firestore = null;
+let boardRef = null;
+let unsubscribe = null;
+let syncEnabled = false;
+const noteTimers = {};
+
+const els = {
+  search: document.getElementById("search"),
+  boardInput: document.getElementById("boardInput"),
+  category: document.getElementById("category"),
+  ward: document.getElementById("ward"),
+  gender: document.getElementById("gender"),
+  ibCertified: document.getElementById("ibCertified"),
+  chinese: document.getElementById("chinese"),
+  priority: document.getElementById("priority"),
+  sort: document.getElementById("sort"),
+  onlyShortlist: document.getElementById("onlyShortlist"),
+  onlyConcerns: document.getElementById("onlyConcerns"),
+  hideExcelExcluded: document.getElementById("hideExcelExcluded"),
+  resetBtn: document.getElementById("resetBtn"),
+  exportBtn: document.getElementById("exportBtn"),
+  copyLinkBtn: document.getElementById("copyLinkBtn"),
+  summary: document.getElementById("summary"),
+  list: document.getElementById("list"),
+  archiveList: document.getElementById("archiveList"),
+  empty: document.getElementById("empty"),
+  archiveEmpty: document.getElementById("archiveEmpty"),
+  syncStatus: document.getElementById("syncStatus"),
+  boardIdPill: document.getElementById("boardIdPill"),
+};
+
+function escapeHtml(str) {
+  return String(str ?? "").replace(/[&<>"]/g, s => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[s]));
+}
+
+function currency(v) {
+  if (v === null || v === undefined || v === "") return "—";
+  const s = String(v).trim();
+  if (/^\d+(\.\d+)?$/.test(s)) return "¥" + Number(s).toLocaleString("en-US");
+  return s;
+}
+
+function feeToNumber(v) {
+  if (!v) return null;
+  const n = String(v).replace(/[^0-9.]/g,"");
+  return n ? Number(n) : null;
+}
+
+function priorityScore(v) {
+  return (String(v || "").match(/★/g) || []).length;
+}
+
+function setupSelect(select, values) {
+  select.innerHTML = `<option value="">すべて</option>` + values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+}
+
+function syncControlsFromState() {
+  els.search.value = state.filters.search || "";
+  els.category.value = state.filters.category || "";
+  els.ward.value = state.filters.ward || "";
+  els.gender.value = state.filters.gender || "";
+  els.ibCertified.value = state.filters.ibCertified || "";
+  els.chinese.value = state.filters.chinese || "";
+  els.priority.value = state.filters.priority || "";
+  els.sort.value = state.filters.sort || "priority";
+  els.onlyShortlist.checked = !!state.filters.onlyShortlist;
+  els.onlyConcerns.checked = !!state.filters.onlyConcerns;
+  els.hideExcelExcluded.checked = !!state.filters.hideExcelExcluded;
+  els.boardInput.value = boardId;
+  els.boardIdPill.textContent = `board=${boardId}`;
+}
+
+function saveLocal() {
+  localStorage.setItem(localKey, JSON.stringify(state));
+}
+
+function loadLocal() {
+  const raw = localStorage.getItem(localKey);
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    Object.assign(state.shortlist, parsed.shortlist || {});
+    Object.assign(state.notes, parsed.notes || {});
+    Object.assign(state.archived, parsed.archived || {});
+    state.filters = { ...state.filters, ...(parsed.filters || {}) };
+  } catch (e) {
+    console.warn("local state parse failed", e);
+  }
+}
+
+async function persist(partial) {
+  state.lastUpdatedAt = new Date().toISOString();
+  if (partial.filters) state.filters = { ...state.filters, ...partial.filters };
+  if (syncEnabled && boardRef) {
+    try {
+      await setDoc(boardRef, {
+        ...partial,
+        lastUpdatedAt: state.lastUpdatedAt,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      els.syncStatus.textContent = "Firebase 同期中";
+      els.syncStatus.classList.remove("local");
+    } catch (e) {
+      console.error(e);
+      els.syncStatus.textContent = "Firebase 保存失敗 → local に退避";
+      saveLocal();
+    }
+  } else {
+    saveLocal();
+  }
+}
+
+function currentFilters() {
+  return {
+    search: els.search.value.trim(),
+    category: els.category.value,
+    ward: els.ward.value,
+    gender: els.gender.value,
+    ibCertified: els.ibCertified.value,
+    chinese: els.chinese.value,
+    priority: els.priority.value,
+    sort: els.sort.value,
+    onlyShortlist: els.onlyShortlist.checked,
+    onlyConcerns: els.onlyConcerns.checked,
+    hideExcelExcluded: els.hideExcelExcluded.checked,
+  };
+}
+
+function matches(s, f) {
+  if (state.archived[String(s.id)]) return false;
+  const blob = [s.name,s.ward,s.area,s.category,s.curriculum,s.memo,s.notes,(state.notes[s.id]||"")].join(" ").toLowerCase();
+  if (f.search && !blob.includes(f.search.toLowerCase())) return false;
+  if (f.category && s.category !== f.category) return false;
+  if (f.ward && s.ward !== f.ward) return false;
+  if (f.gender && s.gender !== f.gender) return false;
+  if (f.ibCertified && s.ibCertified !== f.ibCertified) return false;
+  if (f.chinese && s.chinese !== f.chinese) return false;
+  if (f.priority && s.priority !== f.priority) return false;
+  if (f.onlyShortlist && !state.shortlist[s.id]) return false;
+  if (f.onlyConcerns && !(s.concerns && s.concerns.length)) return false;
+  if (f.hideExcelExcluded && initialExcelExcluded[String(s.id)]) return false;
+  return true;
+}
+
+function sortSchools(list, sortKey) {
+  return [...list].sort((a,b) => {
+    if (sortKey === "name") return a.name.localeCompare(b.name, "ja");
+    if (sortKey === "feeAsc") return (feeToNumber(a.totalFee) ?? Infinity) - (feeToNumber(b.totalFee) ?? Infinity);
+    if (sortKey === "feeDesc") return (feeToNumber(b.totalFee) ?? -Infinity) - (feeToNumber(a.totalFee) ?? -Infinity);
+    if (sortKey === "concerns") return (b.concerns?.length || 0) - (a.concerns?.length || 0);
+    return priorityScore(b.priority) - priorityScore(a.priority) || a.name.localeCompare(b.name, "ja");
+  });
+}
+
+function renderSummary(list) {
+  const total = list.length;
+  const shortlisted = list.filter(s => state.shortlist[s.id]).length;
+  const withConcerns = list.filter(s => s.concerns?.length).length;
+  const excelExcluded = list.filter(s => initialExcelExcluded[String(s.id)]).length;
+  const archivedCount = Object.keys(state.archived).length;
+  els.summary.innerHTML = `
+    <div class="metric"><div class="k">表示中の学校数</div><div class="v">${total}</div></div>
+    <div class="metric"><div class="k">ショートリスト</div><div class="v">${shortlisted}</div></div>
+    <div class="metric"><div class="k">懸念点あり</div><div class="v">${withConcerns}</div></div>
+    <div class="metric"><div class="k">検討候補外（グレー）</div><div class="v">${excelExcluded}</div></div>
+    <div class="metric"><div class="k">完全除外</div><div class="v">${archivedCount}</div></div>
+  `;
+}
+
+function schoolCard(s, archived=false) {
+  const myNote = state.notes[s.id] || "";
+  const shortlisted = !!state.shortlist[s.id];
+  const excelExcluded = !!initialExcelExcluded[String(s.id)];
+  const concerns = (s.concerns || []).map(c => `<li><strong>${escapeHtml(c.field)}:</strong> ${escapeHtml(currency(c.value))}</li>`).join("");
+  const links = [
+    s.site ? `<a href="${escapeHtml(s.site)}" target="_blank" rel="noopener">公式サイト</a>` : "",
+    s.instagram ? `<a href="${escapeHtml(s.instagram)}" target="_blank" rel="noopener">Instagram</a>` : "",
+    s.facebook ? `<a href="${escapeHtml(s.facebook)}" target="_blank" rel="noopener">Facebook</a>` : "",
+  ].filter(Boolean).join("");
+
+  return `
+    <section class="card ${shortlisted ? "shortlisted" : ""} ${excelExcluded ? "excelExcluded" : ""} ${archived ? "archived" : ""}">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+        <h3>${escapeHtml(s.name)}</h3>
+        <div class="actions" style="margin-top:0;">
+          ${archived
+            ? `<button class="restore" onclick="restoreSchool(${s.id})">候補に戻す</button>`
+            : `<button class="secondary" onclick="toggleShortlist(${s.id})">${shortlisted ? "★ 選定中" : "☆ 候補に追加"}</button>
+               <button class="warn" onclick="archiveSchool(${s.id})">完全に除外</button>`}
+        </div>
+      </div>
+
+      <div class="meta">
+        <span class="chip">${escapeHtml(s.category)}</span>
+        <span class="chip gray">${escapeHtml(s.ward)} / ${escapeHtml(s.area)}</span>
+        <span class="chip gray">${escapeHtml(s.gender)}</span>
+        <span class="chip gray">${escapeHtml(s.priority || "優先度未設定")}</span>
+        ${s.ibCertified === "✅" ? '<span class="chip">IB認定</span>' : '<span class="chip gray">IBなし</span>'}
+        ${s.chinese === "あり" ? '<span class="chip">中国語あり</span>' : ''}
+        ${s.chinese === "あり（DP段階）" ? '<span class="chip">中国語あり（DP段階）</span>' : ''}
+        ${excelExcluded ? '<span class="chip muted">検討候補外（Excelグレー）</span>' : ''}
+        ${s.concerns?.length ? `<span class="chip warn">懸念 ${s.concerns.length}件</span>` : ''}
+        ${archived ? '<span class="chip muted">完全除外済み</span>' : ''}
+      </div>
+
+      <div class="kv">
+        <div>対象学年</div><div>${escapeHtml(s.grades || "—")}</div>
+        <div>カリキュラム</div><div>${escapeHtml(s.curriculum || "—")}</div>
+        <div>IBレベル</div><div>${escapeHtml(s.ibLevel || "—")}</div>
+        <div>Total Fee</div><div>${escapeHtml(currency(s.totalFee))}</div>
+        <div>Annual Fee</div><div>${escapeHtml(currency(s.annualFee))}</div>
+        <div>One Time Fee</div><div>${escapeHtml(currency(s.oneTimeFee))}</div>
+        <div>Excel備考</div><div>${escapeHtml(s.notes || "—")}</div>
+      </div>
+
+      <div class="memo">${escapeHtml(s.memo || "")}</div>
+
+      ${excelExcluded ? `<div class="infoBox">この学校は Excel 上でグレー編みがけだったため、元データ上でも「検討候補外」の扱いです。</div>` : ""}
+      ${concerns ? `<div class="concerns"><h4>懸念点（Excelの赤字項目）</h4><ul>${concerns}</ul></div>` : ""}
+
+      <div class="links">${links || '<span class="small">外部リンク未登録</span>'}</div>
+
+      <div class="notes">
+        <label for="note-${s.id}">このページで追加する家族メモ</label>
+        <textarea id="note-${s.id}" rows="3" placeholder="見学後の印象、通学時間、気になる点など" oninput="updateNote(${s.id}, this.value)">${escapeHtml(myNote)}</textarea>
+      </div>
+    </section>
+  `;
+}
+
+function renderList() {
+  const f = currentFilters();
+  state.filters = f;
+  const visible = sortSchools(schools.filter(s => matches(s, f)), f.sort);
+  renderSummary(visible);
+  els.empty.hidden = visible.length !== 0;
+  els.list.innerHTML = visible.map(s => schoolCard(s, false)).join("");
+
+  const archivedSchools = sortSchools(schools.filter(s => state.archived[String(s.id)]), "name");
+  els.archiveEmpty.hidden = archivedSchools.length !== 0;
+  els.archiveList.innerHTML = archivedSchools.map(s => schoolCard(s, true)).join("");
+}
+
+async function updateFilters() {
+  renderList();
+  await persist({ filters: currentFilters() });
+}
+
+async function updateNote(id, value) {
+  state.notes[id] = value;
+  clearTimeout(noteTimers[id]);
+  noteTimers[id] = setTimeout(() => persist({ notes: state.notes }), 1200);
+}
+
+async function toggleShortlist(id) {
+  state.shortlist[id] = !state.shortlist[id];
+  if (!state.shortlist[id]) delete state.shortlist[id];
+  renderList();
+  await persist({ shortlist: state.shortlist });
+}
+
+async function archiveSchool(id) {
+  state.archived[String(id)] = true;
+  if (state.shortlist[id]) delete state.shortlist[id];
+  renderList();
+  await persist({ archived: state.archived, shortlist: state.shortlist });
+}
+
+async function restoreSchool(id) {
+  delete state.archived[String(id)];
+  renderList();
+  await persist({ archived: state.archived });
+}
+
+function exportShortlist() {
+  const selected = schools.filter(s => state.shortlist[s.id] && !state.archived[String(s.id)]).map(s => ({
+    学校名: s.name,
+    区: s.ward,
+    場所: s.area,
+    カテゴリー: s.category,
+    対象学年: s.grades,
+    TotalFee: currency(s.totalFee),
+    懸念点: (s.concerns || []).map(c => `${c.field}: ${currency(c.value)}`).join(" / "),
+    家族メモ: state.notes[s.id] || "",
+    公式サイト: s.site || "",
+  }));
+  const blob = new Blob([JSON.stringify(selected, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "school-shortlist.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function copyShareLink() {
+  const shareUrl = new URL(window.location.href);
+  shareUrl.searchParams.set("board", boardId);
+  await navigator.clipboard.writeText(shareUrl.toString());
+  els.copyLinkBtn.textContent = "コピー済み";
+  setTimeout(() => els.copyLinkBtn.textContent = "共有リンクをコピー", 1200);
+}
+
+function setupSelects() {
+  setupSelect(els.category, filterValues.category);
+  setupSelect(els.ward, filterValues.ward);
+  setupSelect(els.gender, filterValues.gender);
+  setupSelect(els.ibCertified, filterValues.ibCertified);
+  setupSelect(els.chinese, filterValues.chinese);
+  setupSelect(els.priority, filterValues.priority);
+}
+
+function hasFirebaseConfig() {
+  return !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId && FIREBASE_CONFIG.appId);
+}
+
+// ── モバイル フィルター折りたたみ ──
+function toggleFilters() {
+  const body = document.getElementById("filterBody");
+  const btn  = document.getElementById("filterToggleBtn");
+  const collapsed = body.classList.toggle("collapsed");
+  btn.classList.toggle("open", !collapsed);
+  btn.childNodes[0].textContent = collapsed ? "絞り込みを開く " : "絞り込みを閉じる ";
+}
+
+async function startFirebaseSync() {
+  if (!hasFirebaseConfig()) {
+    els.syncStatus.textContent = "Firebase未設定 → localStorage モード";
+    els.syncStatus.classList.add("local");
+    syncEnabled = false;
+    loadLocal();
+    syncControlsFromState();
+    renderList();
+    return;
+  }
+  // Firebase設定済みならセットアップバナーを非表示
+  const setupBanner = document.getElementById("fbSetupBanner");
+  if (setupBanner) setupBanner.classList.add("hidden");
+
+  try {
+    const app = initializeApp(FIREBASE_CONFIG);
+    firestore = getFirestore(app);
+    boardRef = doc(firestore, "school_dashboards", boardId);
+    syncEnabled = true;
+    els.syncStatus.textContent = "Firebase 接続中";
+    unsubscribe?.();
+    unsubscribe = onSnapshot(boardRef, async (snap) => {
+      if (!snap.exists()) {
+        await setDoc(boardRef, {
+          shortlist: state.shortlist,
+          notes: state.notes,
+          archived: state.archived,
+          filters: state.filters,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        els.syncStatus.textContent = "Firebase 初期化完了";
+        return;
+      }
+      const data = snap.data() || {};
+      state.shortlist = data.shortlist || {};
+      state.notes = data.notes || {};
+      state.archived = data.archived || {};
+      state.filters = { ...state.filters, ...(data.filters || {}) };
+      const activeId = document.activeElement && document.activeElement.id ? document.activeElement.id : "";
+      const editingNote = activeId.startsWith("note-");
+      if (!editingNote) {
+        syncControlsFromState();
+        renderList();
+      }
+      els.syncStatus.textContent = "Firebase 同期中";
+      els.syncStatus.classList.remove("local");
+    }, (err) => {
+      console.error(err);
+      els.syncStatus.textContent = "Firebase 読み込み失敗 → localStorage モード";
+      els.syncStatus.classList.add("local");
+      syncEnabled = false;
+      loadLocal();
+      syncControlsFromState();
+      renderList();
+    });
+  } catch (e) {
+    console.error(e);
+    els.syncStatus.textContent = "Firebase 初期化失敗 → localStorage モード";
+    els.syncStatus.classList.add("local");
+    syncEnabled = false;
+    loadLocal();
+    syncControlsFromState();
+    renderList();
+  }
+}
+
+async function switchBoard(newBoardId) {
+  boardId = newBoardId.trim() || "tokyo-school-family";
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("board", boardId);
+  window.history.replaceState({}, "", nextUrl.toString());
+  Object.assign(state, {
+    shortlist: {},
+    notes: {},
+    archived: {},
+    filters: {
+      search:"", category:"", ward:"", gender:"", ibCertified:"", chinese:"", priority:"",
+      sort:"priority", onlyShortlist:false, onlyConcerns:false, hideExcelExcluded:false
+    },
+    lastUpdatedAt: null
+  });
+  syncControlsFromState();
+  renderList();
+  await startFirebaseSync();
+}
+
+setupSelects();
+syncControlsFromState();
+loadLocal();
+syncControlsFromState();
+renderList();
+
+els.resetBtn.addEventListener("click", async () => {
+  state.filters = {
+    search:"", category:"", ward:"", gender:"", ibCertified:"", chinese:"", priority:"",
+    sort:"priority", onlyShortlist:false, onlyConcerns:false, hideExcelExcluded:false
+  };
+  syncControlsFromState();
+  renderList();
+  await persist({ filters: state.filters });
+});
+els.exportBtn.addEventListener("click", exportShortlist);
+els.copyLinkBtn.addEventListener("click", copyShareLink);
+els.boardInput.addEventListener("change", () => switchBoard(els.boardInput.value));
+
+[
+  els.search, els.category, els.ward, els.gender, els.ibCertified, els.chinese,
+  els.priority, els.sort, els.onlyShortlist, els.onlyConcerns, els.hideExcelExcluded
+].forEach(el => {
+  el.addEventListener("input", updateFilters);
+  el.addEventListener("change", updateFilters);
+});
+
+window.toggleShortlist = toggleShortlist;
+window.updateNote = updateNote;
+window.archiveSchool = archiveSchool;
+window.restoreSchool = restoreSchool;
 
 startFirebaseSync();
 </script>
