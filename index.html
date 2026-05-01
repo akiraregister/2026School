@@ -130,6 +130,41 @@ footer { max-width:1440px; margin:18px auto 40px; color:var(--muted); font-size:
 .fb-setup code { background: rgba(0,0,0,0.07); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
 .fb-setup a { color: #b45309; }
 .fb-setup.hidden { display: none; }
+.filter-toggle-btn {
+  display: none;
+  width: 100%;
+  padding: 12px 16px;
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  margin-bottom: 14px;
+}
+.filter-toggle-btn span { float: right; transition: transform .25s; }
+.filter-toggle-btn.open span { transform: rotate(180deg); }
+@media (max-width: 1100px) {
+  .filter-toggle-btn { display: block; }
+  .filter-body.collapsed { display: none; }
+}
+.fb-setup {
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.fb-setup h4 { margin: 0 0 8px; color: #92400e; font-size: 14px; }
+.fb-setup ol { margin: 0; padding-left: 18px; color: #78350f; }
+.fb-setup li { margin: 3px 0; }
+.fb-setup code { background: rgba(0,0,0,0.07); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+.fb-setup a { color: #b45309; }
+.fb-setup.hidden { display: none; }
 </style>
 </head>
 <body>
@@ -147,8 +182,27 @@ footer { max-width:1440px; margin:18px auto 40px; color:var(--muted); font-size:
 </header>
 
 <div class="topbar">
+    </div>
   <aside class="panel filters">
     <h2>絞り込み</h2>
+
+    <div class="fb-setup" id="fbSetupBanner">
+      <h4>🔥 Firebase 同期が未設定です</h4>
+      <ol>
+        <li><a href="https://console.firebase.google.com/" target="_blank">console.firebase.google.com</a> を開く</li>
+        <li>「プロジェクトを追加」→ 名前は何でもOK（例: tokyo-school）</li>
+        <li>左メニュー「構築」→「Firestore Database」→「データベースを作成」→「テストモード」を選択</li>
+        <li>「プロジェクトの設定（⚙️）」→「ウェブアプリ」→「アプリを追加」→ 表示された設定値をコピー</li>
+        <li>このHTMLの <code>FIREBASE_CONFIG = {</code> の中に貼り付けて保存</li>
+        <li>同じHTMLを奥さまと共有すれば完了</li>
+      </ol>
+    </div>
+
+    <button class="filter-toggle-btn" id="filterToggleBtn" onclick="toggleFilters()">
+      絞り込みを開く <span>▼</span>
+    </button>
+
+    <div class="filter-body collapsed" id="filterBody">
 
     <!-- Firebase 未設定時のセットアップ案内 -->
     <div class="fb-setup" id="fbSetupBanner">
@@ -590,6 +644,14 @@ function hasFirebaseConfig() {
 }
 
 // ── モバイル フィルター折りたたみ ──
+function toggleFilters() {
+  const body = document.getElementById("filterBody");
+  const btn  = document.getElementById("filterToggleBtn");
+  const collapsed = body.classList.toggle("collapsed");
+  btn.classList.toggle("open", !collapsed);
+  btn.childNodes[0].textContent = collapsed ? "絞り込みを開く " : "絞り込みを閉じる ";
+}
+
 function toggleFilters() {
   const body = document.getElementById("filterBody");
   const btn  = document.getElementById("filterToggleBtn");
